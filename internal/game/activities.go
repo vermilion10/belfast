@@ -193,6 +193,13 @@ func (game *Game) activityList(ctx context.Context, commander db.Commander) (*pr
 		if config.Type == activityTypeBossRush {
 			info.Data2List, info.Data3List = bossRushCleared(keyValues[config.ID])
 		}
+		if config.Type == activityTypePTBuffMark2 {
+			earned, held, err := ptBuffState(ctx, game.DB.Queries, commander.ID, config, state)
+			if err != nil {
+				return nil, err
+			}
+			info.Data1, info.Data4 = proto.Uint32(earned), proto.Uint32(held)
+		}
 		reply.ActivityList = append(reply.ActivityList, info)
 	}
 	return reply, nil
