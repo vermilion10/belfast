@@ -94,6 +94,12 @@ const (
 	VirtualItemCruisePt = 59599 // cruise pass points (SubmitActiveTaskCommand)
 )
 
+// mingshiStarterTask is the paw hunt's first task (activity 21's config_id,
+// "Help out *Nyaa*!"): TaskProxy:mingshiTouchFlagEnabled hides the paws of
+// every screen once the commander has it, so it is sent among the claimed
+// tasks of SC_20001 too.
+const mingshiStarterTask = 5001
+
 // ActivityConst.ACTIVITY_TYPE_* of the activities whose tasks come in
 // SC_20201 (TotalTaskProxy)
 const (
@@ -162,7 +168,7 @@ func taskList(ctx context.Context, queries *db.Queries, commanderID uint32) (*pr
 		return nil, err
 	}
 	for _, task := range claimed {
-		if blueprintTask(task.TaskID) || kept[task.TaskID] {
+		if blueprintTask(task.TaskID) || kept[task.TaskID] || task.TaskID == mingshiStarterTask {
 			msg.Info = append(msg.Info, &protobuf.TASKINFO{
 				Id:         proto.Uint32(task.TaskID),
 				Progress:   proto.Uint32(task.Progress),
