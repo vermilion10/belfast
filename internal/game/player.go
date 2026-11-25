@@ -2,6 +2,8 @@ package game
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"maps"
 	"slices"
 	"time"
@@ -146,6 +148,14 @@ func (game *Game) playerInfo(ctx context.Context, commander db.Commander, ships 
 	if record.ShipCount != 0 {
 		shipCount = record.ShipCount
 	}
+	// the profile's highest rank: the season's best exercise rank, kept
+	// across season resets by the commander's rank
+	maxRank := commander.Rank
+	exercise, err := game.DB.GetExercise(ctx, commander.ID)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+	maxRank = max(maxRank, exercise.BestRank)
 	look, err := appearance(ctx, game.DB.Queries, commander.ID)
 	if err != nil {
 		return nil, err
@@ -177,6 +187,7 @@ func (game *Game) playerInfo(ctx context.Context, commander db.Commander, ships 
 		ShipBagMax:         proto.Uint32(commander.ShipBagMax),
 		EquipBagMax:        proto.Uint32(commander.EquipBagMax),
 		Rank:               proto.Uint32(commander.Rank),
+		MaxRank:            proto.Uint32(maxRank),
 		GuideIndex:         proto.Uint32(commander.GuideIndex),
 		ChatRoomId:         proto.Uint32(commander.ChatRoomID),
 		RegisterTime:       proto.Uint32(uint32(commander.RegisteredAt)),
