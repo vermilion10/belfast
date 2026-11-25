@@ -283,6 +283,8 @@ func (game *Game) handleActivityOperation(client *connection.Client, req *protob
 			return game.cruiseOperation(client, config, req)
 		case activityTypeBossRush:
 			return game.bossRushOperation(client, config, req)
+		case activityTypePTBuffMark2:
+			return game.ptBuffOperation(client, config, req)
 		}
 	}
 	activityType := config.Type
