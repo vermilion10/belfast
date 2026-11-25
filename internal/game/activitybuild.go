@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"math/rand/v2"
+	"sync"
 	"time"
 
 	"github.com/ggmolly/belfast/internal/connection"
 	"github.com/ggmolly/belfast/internal/db"
+	"github.com/ggmolly/belfast/internal/gamedata"
 	"github.com/ggmolly/belfast/internal/protobuf"
 )
 
@@ -31,12 +33,15 @@ const activityBuildRateScale = 10000
 func (game *Game) activityBuildOperation(client *connection.Client, config activityConfig, req *protobuf.CS_11202) error {
 	ctx := context.Background()
 	now := time.Now().Unix()
-	pool, ok := buildPools[config.ConfigID]
+	pool, ok, err := limitedBuildPool(config.ConfigID)
+	if err != nil {
+		return err
+	}
 	count := req.GetArg1()
 	var rateUps [][2]uint32
 	_ = json.Unmarshal(config.ConfigData, &rateUps)
 	reply := &protobuf.SC_11203{Result: result(nil)}
-	err := errRefused
+	err = errRefused
 	if ok && req.GetArg2() == 0 && count >= 1 && count <= maxBuilds {
 		err = game.tx(ctx, client, func(tx *Tx) error {
 			builds, err := tx.ListBuilds(ctx, client.CommanderID)
@@ -90,6 +95,36 @@ func (game *Game) activityBuildOperation(client *connection.Client, config activ
 		return err
 	}
 	return client.Send(reply)
+}
+
+// buildPoolSpecial is the Special Construction pool (ship_data_create_material
+// 1), whose ships a limited construction draws besides its rate-up ones.
+const buildPoolSpecial = 1
+
+var buildMaterials = sync.OnceValues(func() (map[uint32]buildPool, error) {
+	return gamedata.Table[buildPool]("ship_data_create_material")
+})
+
+// limitedBuildPool is a limited construction's pool: the costs of its own
+// ship_data_create_material row, the ships and rates of the Special
+// Construction (no ship_data_group description links a limited pool, so
+// buildPools leaves it out).
+func limitedBuildPool(id uint32) (buildPool, bool, error) {
+	if pool, ok := buildPools[id]; ok {
+		return pool, true, nil
+	}
+	materials, err := buildMaterials()
+	if err != nil {
+		return buildPool{}, false, err
+	}
+	costs, ok := materials[id]
+	special, known := buildPools[buildPoolSpecial]
+	if !ok || !known {
+		return buildPool{}, false, nil
+	}
+	pool := special
+	pool.Gold, pool.Item, pool.ItemCount, pool.ExchangeCount = costs.Gold, costs.Item, costs.ItemCount, costs.ExchangeCount
+	return pool, true, nil
 }
 
 // pickActivityBuildShip draws a limited construction's ship: each rate-up
