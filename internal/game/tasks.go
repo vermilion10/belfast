@@ -169,7 +169,7 @@ func taskList(ctx context.Context, queries *db.Queries, commanderID uint32) (*pr
 		return nil, err
 	}
 	for _, task := range claimed {
-		if blueprintTask(task.TaskID) || kept[task.TaskID] || task.TaskID == mingshiStarterTask {
+		if blueprintTask(task.TaskID) || kept[task.TaskID] || task.TaskID == mingshiStarterTask || techCatchupTask(task.TaskID) {
 			msg.Info = append(msg.Info, &protobuf.TASKINFO{
 				Id:         proto.Uint32(task.TaskID),
 				Progress:   proto.Uint32(task.Progress),

@@ -293,6 +293,8 @@ func (game *Game) handleActivityOperation(client *connection.Client, req *protob
 			return game.activityBuildOperation(client, config, req)
 		case activityTypePuzzle:
 			return game.puzzleOperation(client, config, req)
+		case activityTypeTecCatchup:
+			return game.tecCatchupOperation(client, config, req)
 		}
 	}
 	activityType := config.Type
