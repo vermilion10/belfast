@@ -36,6 +36,7 @@ const (
 	TaskSubAcademyLevel  = 85   // canteen / merchant level (absolute)
 	TaskSubResearch      = 110  // Research Academy projects claimed
 	TaskSubHandbookPhase = 114  // commander manual tasks claimed, target: page id
+	TaskSubJoinGuild     = 403  // in a guild, counted from the membership
 	TaskSubUseItem       = 120  // items used, target: item id
 	TaskSubSpendOil      = 121  // oil spent
 	TaskSubObtainItem    = 130  // items obtained, target: item id
@@ -794,6 +795,15 @@ func (game *Game) taskClaim(ctx context.Context, commanderID, id uint32) (taskCl
 	}
 	// a "Gather" task's progress is what the commander owns, paid on claim
 	reached := task.Progress >= config.TargetNum || taskGiveCost(config) != nil
+	// a "join a guild" task's progress is whether the commander is in one,
+	// as the client counts it (Task:getProgress, TASK_SUB_TYPE_JOIN_GUILD)
+	if config.SubType == TaskSubJoinGuild && !reached {
+		_, err := game.DB.GetGuildMember(ctx, commanderID)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return taskClaimed{}, false, err
+		}
+		reached = err == nil
+	}
 	ok = ok && task.SubmitTime == 0 && reached
 	drops := config.awards
 	refluxDrops, isReflux, unlocked, err := refluxTaskClaim(ctx, game.DB.Queries, commanderID, id, time.Now())
