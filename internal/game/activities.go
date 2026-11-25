@@ -190,6 +190,9 @@ func (game *Game) activityList(ctx context.Context, commander db.Commander) (*pr
 			info.Data1 = proto.Uint32(pt)
 			info.Data2List = cruiseBonusClaims(keyValues[config.ID])
 		}
+		if config.Type == activityTypeBossRush {
+			info.Data2List, info.Data3List = bossRushCleared(keyValues[config.ID])
+		}
 		reply.ActivityList = append(reply.ActivityList, info)
 	}
 	return reply, nil
@@ -271,6 +274,8 @@ func (game *Game) handleActivityOperation(client *connection.Client, req *protob
 			return game.flowerFieldOperation(client, config, req)
 		case activityTypeCruise:
 			return game.cruiseOperation(client, config, req)
+		case activityTypeBossRush:
+			return game.bossRushOperation(client, config, req)
 		}
 	}
 	activityType := config.Type
