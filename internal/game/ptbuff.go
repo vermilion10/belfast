@@ -78,7 +78,13 @@ func (tx *Tx) addPtEarned(itemID, amount uint32) error {
 	if err != nil {
 		return err
 	}
-	state.Data1 += amount
+	// the PT held before this drop were all earned, if data1 didn't count
+	// them yet (earned before it was kept)
+	held, err := tx.GetVirtualItem(tx.ctx, db.GetVirtualItemParams{CommanderID: tx.commanderID, ItemID: itemID})
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
+	state.Data1 = max(state.Data1, held-min(held, amount)) + amount
 	return tx.SaveActivity(tx.ctx, db.SaveActivityParams(state))
 }
 
