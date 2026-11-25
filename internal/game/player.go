@@ -138,6 +138,14 @@ func (game *Game) playerInfo(ctx context.Context, commander db.Commander, ships 
 	if err != nil {
 		return nil, err
 	}
+	record, err := game.DB.GetProfileStats(ctx, commander.ID)
+	if err != nil {
+		return nil, err
+	}
+	shipCount := uint32(len(ships))
+	if record.ShipCount != 0 {
+		shipCount = record.ShipCount
+	}
 	look, err := appearance(ctx, game.DB.Queries, commander.ID)
 	if err != nil {
 		return nil, err
@@ -172,7 +180,12 @@ func (game *Game) playerInfo(ctx context.Context, commander db.Commander, ships 
 		GuideIndex:         proto.Uint32(commander.GuideIndex),
 		ChatRoomId:         proto.Uint32(commander.ChatRoomID),
 		RegisterTime:       proto.Uint32(uint32(commander.RegisteredAt)),
-		ShipCount:          proto.Uint32(uint32(len(ships))),
+		ShipCount:          proto.Uint32(shipCount),
+		AttackCount:        proto.Uint32(record.AttackCount),
+		WinCount:           proto.Uint32(record.WinCount),
+		PvpAttackCount:     proto.Uint32(record.PvpAttackCount),
+		PvpWinCount:        proto.Uint32(record.PvpWinCount),
+		CollectAttackCount: proto.Uint32(record.CollectAttackCount),
 		CommanderBagMax:    proto.Uint32(commander.CommanderBagMax),
 		Display:            game.displayInfo(commander),
 		MailStoreroomLv:    proto.Uint32(commander.MailStoreroomLv),

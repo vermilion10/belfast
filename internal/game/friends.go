@@ -105,11 +105,19 @@ func (game *Game) friendInfo(commander db.Commander) *protobuf.FRIEND_INFO {
 }
 
 // detailInfo is a commander's profile card (resumeLayer, the search page):
-// battle and exercise counts aren't kept, they read 0.
+// the battle and exercise counts are commander_profile_stats', 0 without
+// a row.
 func (game *Game) detailInfo(ctx context.Context, commander db.Commander) (*protobuf.DETAIL_INFO, error) {
 	ships, err := game.DB.CountShips(ctx, commander.ID)
 	if err != nil {
 		return nil, err
+	}
+	record, err := game.DB.GetProfileStats(ctx, commander.ID)
+	if err != nil {
+		return nil, err
+	}
+	if record.ShipCount != 0 {
+		ships = int64(record.ShipCount)
 	}
 	groups, err := game.DB.CountShipGroups(ctx, commander.ID)
 	if err != nil {
@@ -121,17 +129,22 @@ func (game *Game) detailInfo(ctx context.Context, commander db.Commander) (*prot
 	}
 	friend := game.friendInfo(commander)
 	return &protobuf.DETAIL_INFO{
-		MedalId:         medals,
-		Id:              friend.Id,
-		Name:            friend.Name,
-		Title:           proto.Uint32(commander.Rank),
-		Lv:              friend.Lv,
-		ShipCount:       proto.Uint32(uint32(ships)),
-		CollectionCount: proto.Uint32(uint32(groups)),
-		Adv:             friend.Adv,
-		Online:          friend.Online,
-		PreOnlineTime:   friend.PreOnlineTime,
-		Display:         friend.Display,
+		MedalId:            medals,
+		Id:                 friend.Id,
+		Name:               friend.Name,
+		Title:              proto.Uint32(commander.Rank),
+		Lv:                 friend.Lv,
+		ShipCount:          proto.Uint32(uint32(ships)),
+		CollectionCount:    proto.Uint32(uint32(groups)),
+		AttackCount:        proto.Uint32(record.AttackCount),
+		WinCount:           proto.Uint32(record.WinCount),
+		PvpAttackCount:     proto.Uint32(record.PvpAttackCount),
+		PvpWinCount:        proto.Uint32(record.PvpWinCount),
+		CollectAttackCount: proto.Uint32(record.CollectAttackCount),
+		Adv:                friend.Adv,
+		Online:             friend.Online,
+		PreOnlineTime:      friend.PreOnlineTime,
+		Display:            friend.Display,
 	}, nil
 }
 

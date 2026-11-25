@@ -42,6 +42,10 @@ func Open(path string) (*Store, error) {
 		conn.Close()
 		return nil, err
 	}
+	if err := ensureProfileStats(conn); err != nil {
+		conn.Close()
+		return nil, err
+	}
 	return &Store{Queries: New(conn), conn: conn}, nil
 }
 
