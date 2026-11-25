@@ -193,6 +193,9 @@ func (game *Game) activityList(ctx context.Context, commander db.Commander) (*pr
 		if config.Type == activityTypeBossRush {
 			info.Data2List, info.Data3List = bossRushCleared(keyValues[config.ID])
 		}
+		if config.Type == activityTypePuzzle {
+			info.Data2List = puzzleFound(keyValues[config.ID])
+		}
 		if config.Type == activityTypePTBuffMark2 {
 			earned, held, err := ptBuffState(ctx, game.DB.Queries, commander.ID, config, state)
 			if err != nil {
@@ -285,6 +288,10 @@ func (game *Game) handleActivityOperation(client *connection.Client, req *protob
 			return game.bossRushOperation(client, config, req)
 		case activityTypePTBuffMark2:
 			return game.ptBuffOperation(client, config, req)
+		case activityTypeBuildShip:
+			return game.activityBuildOperation(client, config, req)
+		case activityTypePuzzle:
+			return game.puzzleOperation(client, config, req)
 		}
 	}
 	activityType := config.Type
