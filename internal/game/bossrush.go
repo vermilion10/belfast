@@ -32,8 +32,9 @@ import (
 // lists; data1_list counts the bonus uses of each series of config_data.
 //
 // Built from the Lua alone (never captured). GUESS: a stage won gives the
-// ship and commander exp of any battle and no drops; a series cleared gives
-// its pass_awards_display entries that have an amount (the event PT).
+// ship and commander exp of any battle and rolls its expedition's
+// award_display (bossRushDrops); a series cleared gives its
+// pass_awards_display entries that have an amount (the event PT).
 
 const (
 	systemBossRush   = 12 // SYSTEM_BOSS_RUSH
@@ -68,6 +69,48 @@ func (series bossRushSeriesConfig) passAwards() [][]uint32 {
 		return nil
 	}
 	return slices.DeleteFunc(awards, func(award []uint32) bool { return len(award) < 3 || award[2] == 0 })
+}
+
+// bossRushDesignChance is the chance a won stage draws from a gear design
+// pool ("Has a chance to give the following gear design"). GUESS: no table
+// has the rate.
+const bossRushDesignChance = 0.5
+
+// bossRushDrops rolls a won stage's loot from its award_display, which only
+// says what can drop. GUESS, by analogy with a campaign boss (scenarioDrops):
+// the coins (59001) are a boss's coins, a gear part pool is drawn
+// bossGearParts times, a gear design pool once at bossRushDesignChance, and
+// anything else is given as listed.
+func bossRushDrops(expedition expeditionTemplate) []*protobuf.DROPINFO {
+	var awards [][]uint32
+	if json.Unmarshal(expedition.AwardDisplay, &awards) != nil {
+		return nil
+	}
+	var drops []*protobuf.DROPINFO
+	for _, award := range awards {
+		if len(award) < 3 {
+			continue
+		}
+		kind, id, count := award[0], award[1], award[2]
+		pool := dropPools[id]
+		switch {
+		case id == vitemResearchCoins:
+			drops = mergeDrop(drops, dropTypeResource, ResourceGold, scenarioBossGold)
+		case len(pool) == 0:
+			drops = mergeDrop(drops, kind, id, count)
+		case pool[0].kind == dropTypeItem && pool[0].id >= 17000 && pool[0].id < 18000:
+			for range bossGearParts {
+				ref := pool[rand.IntN(len(pool))]
+				drops = mergeDrop(drops, ref.kind, ref.id, 1)
+			}
+		default:
+			if rand.Float64() < bossRushDesignChance {
+				ref := pool[rand.IntN(len(pool))]
+				drops = mergeDrop(drops, ref.kind, ref.id, 1)
+			}
+		}
+	}
+	return drops
 }
 
 // bossRushCleared are the series cleared in single and multiple mode.
@@ -331,6 +374,10 @@ func (game *Game) finishBossRush(client *connection.Client, req *protobuf.CS_400
 			if err := tx.SpendResource(ResourceOil, endOil); err == ErrNotEnough {
 				logger.WithFields("BossRush", logger.FieldValue("oil", endOil)).Warn("not enough oil left for the end of a boss rush battle")
 			} else if err != nil {
+				return err
+			}
+			reply.DropInfo = bossRushDrops(expedition)
+			if err := tx.grantDrops(reply.DropInfo); err != nil {
 				return err
 			}
 		}

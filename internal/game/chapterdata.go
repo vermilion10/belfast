@@ -123,6 +123,8 @@ type expeditionTemplate struct {
 	Exp   uint32 `json:"exp"`   // base ship exp
 	Level uint32 `json:"level"` // the enemy's level
 	Type  uint32 `json:"type"`
+	// what the battle can drop, [type, id, count] or "" (boss rush stages)
+	AwardDisplay json.RawMessage `json:"award_display"`
 }
 
 var expeditionTemplates map[uint32]expeditionTemplate
