@@ -83,8 +83,24 @@ func bossRushCleared(lists map[uint32][]*protobuf.KEYVALUE_P11) (single, multi [
 	return single, multi
 }
 
+// bossRushRun is a commander's traced series: the SC_40004 of each stage
+// fought, pushed back in SC_40009 at the settlement.
+type bossRushRun struct {
+	system  uint32
+	results []*protobuf.SC_40004
+}
+
+// bossRushRuns are the series being fought, by commander. They live in
+// memory only: a restart mid-series settles it with no stage results.
+var bossRushRuns sync.Map
+
 // bossRushOperation answers BossRushTracingCommand and
-// BossRushSettlementCommand. A refused one gets result 1.
+// BossRushSettlementCommand. A refused one gets result 1. Before the
+// settlement's SC_11203 comes SC_40009 (the stages' SC_40004 and the
+// series): ActivityProxy builds the runtime settlementData from it, which
+// the settlement's reply handler reads (BossRushSettlementCommand), and
+// applies the stages' exp, which the client didn't apply after each stage
+// (BattleGateBossRush.Exit only records it).
 func (game *Game) bossRushOperation(client *connection.Client, config activityConfig, req *protobuf.CS_11202) error {
 	ctx := context.Background()
 	configs, err := bossRushSeriesConfigs()
@@ -92,6 +108,7 @@ func (game *Game) bossRushOperation(client *connection.Client, config activityCo
 		return err
 	}
 	reply := &protobuf.SC_11203{Result: result(nil)}
+	var settled uint32
 	err = game.tx(ctx, client, func(tx *Tx) error {
 		state, err := activityState(ctx, tx.Queries, client.CommanderID, config)
 		if err != nil {
@@ -115,12 +132,14 @@ func (game *Game) bossRushOperation(client *connection.Client, config activityCo
 				return errRefused
 			}
 			state.Data2, state.Data3, state.Data4 = id, 0, req.GetArg2()
+			bossRushRuns.Delete(client.CommanderID)
 		case bossRushCmdSettle:
 			id := state.Data2
 			series, ok := configs[id]
 			if !ok {
 				return errRefused
 			}
+			settled = id
 			if state.Data3 >= uint32(len(series.ExpeditionID)) {
 				list, cleared := bossRushMultiList, multi
 				if state.Data4 == bossRushModeSingle {
@@ -157,7 +176,26 @@ func (game *Game) bossRushOperation(client *connection.Client, config activityCo
 	if err != nil {
 		return err
 	}
+	if settled != 0 {
+		push := &protobuf.SC_40009{System: proto.Uint32(systemBossRush), Arg1: proto.Uint32(settled)}
+		if value, ok := bossRushRuns.LoadAndDelete(client.CommanderID); ok {
+			run := value.(*bossRushRun)
+			push.System = proto.Uint32(run.system)
+			push.Re40004 = run.results
+		}
+		if err := client.Send(push); err != nil {
+			return err
+		}
+	}
 	return client.Send(reply)
+}
+
+// recordBossRushStage keeps a stage's SC_40004 for the settlement.
+func recordBossRushStage(commanderID, system uint32, reply *protobuf.SC_40004) {
+	value, _ := bossRushRuns.LoadOrStore(commanderID, &bossRushRun{system: system})
+	run := value.(*bossRushRun)
+	run.system = system
+	run.results = append(run.results, reply)
 }
 
 // bossRushStage finds the open boss rush whose traced series holds
@@ -302,5 +340,6 @@ func (game *Game) finishBossRush(client *connection.Client, req *protobuf.CS_400
 	if err != nil {
 		return err
 	}
+	recordBossRushStage(client.CommanderID, req.GetSystem(), reply)
 	return client.Send(reply)
 }
