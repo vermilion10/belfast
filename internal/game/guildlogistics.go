@@ -930,6 +930,9 @@ func (game *Game) handleTriggerTask(client *connection.Client, req *protobuf.CS_
 	if err != nil && !refused(err) {
 		return err
 	}
+	if err != nil {
+		logger.WithFields("Task", logger.FieldValue("id", req.GetId())).Warn("trigger refused")
+	}
 	reply.Result = result(err)
 	return client.Send(reply)
 }
