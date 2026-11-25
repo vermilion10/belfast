@@ -15,6 +15,7 @@ import (
 	"github.com/ggmolly/belfast/internal/connection"
 	"github.com/ggmolly/belfast/internal/db"
 	"github.com/ggmolly/belfast/internal/gamedata"
+	"github.com/ggmolly/belfast/internal/logger"
 	"github.com/ggmolly/belfast/internal/protobuf"
 )
 
@@ -347,6 +348,9 @@ func (game *Game) handleActivityOperation(client *connection.Client, req *protob
 		err = errRefused
 	}
 	if refused(err) {
+		logger.WithFields("Activity", logger.FieldValue("id", req.GetActivityId()), logger.FieldValue("type", config.Type),
+			logger.FieldValue("open", open), logger.FieldValue("cmd", req.GetCmd()), logger.FieldValue("arg1", req.GetArg1()),
+			logger.FieldValue("arg2", req.GetArg2())).Warn("operation refused")
 		return client.Send(&protobuf.SC_11203{Result: result(errRefused)})
 	}
 	if err != nil {
