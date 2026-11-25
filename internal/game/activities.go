@@ -180,6 +180,16 @@ func (game *Game) activityList(ctx context.Context, commander db.Commander) (*pr
 		if config.Type == activityTypeIslandDrawAward {
 			info.Data2List = islandDrawClaims(keyValues[config.ID])
 		}
+		if config.Type == activityTypeCruise {
+			// the pt live in the TaskSubCruisePt counter, the bonus
+			// track's claims in a key-value list
+			pt, err := cruisePoints(ctx, game.DB.Queries, commander.ID)
+			if err != nil {
+				return nil, err
+			}
+			info.Data1 = proto.Uint32(pt)
+			info.Data2List = cruiseBonusClaims(keyValues[config.ID])
+		}
 		reply.ActivityList = append(reply.ActivityList, info)
 	}
 	return reply, nil
@@ -259,6 +269,8 @@ func (game *Game) handleActivityOperation(client *connection.Client, req *protob
 			return game.islandOperation(client, config, req)
 		case activityTypeFlowerField:
 			return game.flowerFieldOperation(client, config, req)
+		case activityTypeCruise:
+			return game.cruiseOperation(client, config, req)
 		}
 	}
 	activityType := config.Type
